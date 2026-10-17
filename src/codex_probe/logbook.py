@@ -33,3 +33,6 @@ class JsonlCallLog:
             return []
         with self._path.open(encoding="utf-8") as file:
             return [CallRecord.from_dict(json.loads(line)) for line in file if line.strip()]
+
+
+# NOTE: writes every call straight to disk as one json line. crash safe, nothing buffered

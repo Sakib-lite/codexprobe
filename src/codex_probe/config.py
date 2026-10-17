@@ -88,3 +88,6 @@ def _parse_seed(raw: dict[str, Any]) -> int | None:
     if seed is not None and (not isinstance(seed, int) or isinstance(seed, bool)):
         raise ConfigError(f"seed must be an integer, got {seed!r}")
     return seed
+
+
+# NOTE: turns the raw config dict into a frozen object. all the validation happens here once

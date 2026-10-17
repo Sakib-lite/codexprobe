@@ -23,3 +23,6 @@ class CallRecord:
     def from_dict(cls, raw: dict[str, Any]) -> "CallRecord":
         """Rebuild a record from a dict produced by to_dict."""
         return cls(**raw)
+
+
+# NOTE: one llm call = one record. backend_base_url tells which server actually answered
