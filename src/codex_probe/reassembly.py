@@ -143,5 +143,5 @@ def _partial_response(events: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 # NOTE: joins the delta chunks back into one full response. tool call args come in pieces too
-# EXAMPLE: { "id": "c1", "object": "chat.completion", "created": 123, "model": "gpt-4",   "choices": [ { "index": 0, "message": { "role": "assistant", "content": "Hello!", },  "finish_reason": "stop", } ], "usage": {"total_tokens": 5}, } 
+# EXAMPLE: { "id": "c1", "object": "chat.completion", "created": 123, "model": "gpt-4",   "choices": [ { "index": 0, "message": { "role": "assistant", "content": "Hello!", },  "finish_reason": "stop", } ], "usage": {"total_tokens": 5}, }
 # For Response api just find the last completed response. full final response is there. For chat completion just merge the chunks after filtering

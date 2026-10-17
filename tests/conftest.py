@@ -1,12 +1,18 @@
-from collections.abc import Callable
+import asyncio
+import socket
+import threading
+import time
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from codex_probe.config import ProbeConfig
@@ -37,11 +43,14 @@ class MockBackend:
         self.status_code = 200
         self.body: dict[str, Any] = dict(MOCK_COMPLETION)
         self.headers: dict[str, str] = {"x-request-id": "req-mock-1"}
+        self.stream_chunks: list[bytes] | None = None
+        self.stream_delay = 0.0
+        self.fail_after: int | None = None
 
     def app(self) -> Starlette:
         return Starlette(routes=[Route("/{path:path}", self._handle, methods=["GET", "POST"])])
 
-    async def _handle(self, request: Request) -> JSONResponse:
+    async def _handle(self, request: Request) -> Response:
         self.requests.append(
             {
                 "method": request.method,
@@ -51,7 +60,22 @@ class MockBackend:
                 "body": await request.body(),
             }
         )
+        if self.stream_chunks is not None:
+            return StreamingResponse(
+                self._stream(self.stream_chunks),
+                status_code=self.status_code,
+                media_type="text/event-stream",
+                headers=self.headers,
+            )
         return JSONResponse(self.body, status_code=self.status_code, headers=self.headers)
+
+    async def _stream(self, chunks: list[bytes]) -> AsyncIterator[bytes]:
+        for position, chunk in enumerate(chunks):
+            if self.fail_after is not None and position >= self.fail_after:
+                raise RuntimeError("backend dropped the stream")
+            if self.stream_delay:
+                await asyncio.sleep(self.stream_delay)
+            yield chunk
 
 
 def default_config() -> ProbeConfig:
@@ -68,6 +92,30 @@ def backend() -> MockBackend:
 @pytest.fixture
 def log(tmp_path: Path) -> JsonlCallLog:
     return JsonlCallLog(tmp_path, "test-session")
+
+
+@contextmanager
+def live_server(app: Starlette) -> Iterator[str]:
+    port = _free_port()
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 5
+    while not server.started:
+        if time.monotonic() > deadline:
+            raise RuntimeError("test server did not start in time")
+        time.sleep(0.01)
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+
+
+def _free_port() -> int:
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
 
 
 @pytest.fixture
