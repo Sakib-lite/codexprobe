@@ -96,7 +96,7 @@ def log(tmp_path: Path) -> JsonlCallLog:
 
 @contextmanager
 def live_server(app: Starlette) -> Iterator[str]:
-    port = _free_port()
+    port = free_port()
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -112,7 +112,7 @@ def live_server(app: Starlette) -> Iterator[str]:
         thread.join(timeout=5)
 
 
-def _free_port() -> int:
+def free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])

@@ -9,6 +9,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 from starlette.routing import Route
+from starlette.types import Lifespan
 
 from codex_probe.config import ProbeConfig
 from codex_probe.logbook import CallLog
@@ -148,9 +149,15 @@ class RecordingProxy:
         )
 
 
-def build_app(config: ProbeConfig, client: httpx.AsyncClient, log: CallLog) -> Starlette:
+def build_app(
+    config: ProbeConfig,
+    client: httpx.AsyncClient,
+    log: CallLog,
+    lifespan: Lifespan[Starlette] | None = None,
+) -> Starlette:
     proxy = RecordingProxy(config, client, log, reassembler_for(config.wire_api))
-    return Starlette(routes=[Route("/v1/{path:path}", proxy.handle, methods=["GET", "POST"])])
+    routes = [Route("/v1/{path:path}", proxy.handle, methods=["GET", "POST"])]
+    return Starlette(routes=routes, lifespan=lifespan)
 
 
 def _is_event_stream(upstream: httpx.Response) -> bool:
