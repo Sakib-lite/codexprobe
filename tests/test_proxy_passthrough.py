@@ -1,8 +1,11 @@
 import json
 from typing import Any
 
+import httpx
+
 from codex_probe.config import ProbeConfig
 from codex_probe.logbook import JsonlCallLog
+from codex_probe.proxy import build_app
 from tests.conftest import MOCK_COMPLETION, MakeProxy, MockBackend
 
 CHAT_REQUEST: dict[str, Any] = {
@@ -101,3 +104,18 @@ async def test_calls_recorded_fully_and_in_order(make_proxy: MakeProxy, log: Jso
     assert first.latency_ms >= 0
     assert first.backend_base_url == "https://backend.test/v1"
     assert first.path == "/v1/chat/completions"
+
+
+async def test_unreachable_backend_returns_502_and_records(log: JsonlCallLog) -> None:
+    config = ProbeConfig.from_dict({"upstream": {"base_url": "http://127.0.0.1:9/v1"}})
+    upstream_client = httpx.AsyncClient(timeout=httpx.Timeout(1.0))
+    app = build_app(config, upstream_client, log)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://probe.test"
+    ) as client:
+        response = await client.post("/v1/chat/completions", json=CHAT_REQUEST)
+    assert response.status_code == 502
+    assert response.json()["error"]["type"] == "upstream_connection_error"
+    record = log.load()[0]
+    assert record.response_status == 502
+    assert record.request_body == CHAT_REQUEST

@@ -48,7 +48,12 @@ class RecordingProxy:
             content=request_body,
             headers=self._upstream_headers(request),
         )
-        upstream = await self._client.send(upstream_request, stream=True)
+        try:
+            upstream = await self._client.send(upstream_request, stream=True)
+        except httpx.HTTPError as error:
+            return self._upstream_unreachable(
+                index, started_at, request, request_body, error, clock_start
+            )
         if _is_event_stream(upstream):
             relay = self._relay_recording(
                 index, started_at, request, request_body, upstream, clock_start
@@ -100,6 +105,28 @@ class RecordingProxy:
                 streamed=True,
                 latency_ms=_elapsed_ms(clock_start),
             )
+
+    def _upstream_unreachable(
+        self,
+        index: int,
+        started_at: str,
+        request: Request,
+        request_body: bytes,
+        error: httpx.HTTPError,
+        clock_start: float,
+    ) -> Response:
+        body = {"error": {"message": str(error), "type": "upstream_connection_error"}}
+        self._record(
+            index=index,
+            started_at=started_at,
+            request=request,
+            request_body=request_body,
+            response_status=502,
+            response_body=body,
+            streamed=False,
+            latency_ms=_elapsed_ms(clock_start),
+        )
+        return Response(content=json.dumps(body), status_code=502, media_type="application/json")
 
     def _next_index(self) -> int:
         index = self._index
