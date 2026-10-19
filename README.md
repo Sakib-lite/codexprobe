@@ -23,7 +23,7 @@ Requires Python 3.12+.
 git clone <this repo> && cd codex-llm
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest   # 70 tests, no network or API key needed
+.venv/bin/pytest   # 73 tests, no network or API key needed
 ```
 
 ## Usage
@@ -63,9 +63,47 @@ An optional `"seed": <int>` at the top level makes runs more reproducible: the p
 seed to any JSON request that doesn't already carry one. Without it (the default), request bodies
 are forwarded byte for byte.
 
-## Pointing Codex at the recorder
+## How to test this, step by step
 
-Add a provider to `~/.codex/config.toml` (or pass the same values with `-c` flags):
+**1. Run the test suite** (no setup needed):
+
+```bash
+.venv/bin/pytest
+```
+
+**2. Look at a real captured session** (no setup needed — this already happened):
+
+```bash
+python3 -m json.tool < examples/sample_logs/zai-glm-5.3-codex-session.jsonl
+```
+
+**3. Run a fresh session yourself**, in two terminals. This never edits your `~/.codex/config.toml` —
+it passes the same settings as one-off `-c` flags instead.
+
+Terminal 1 — start the recorder (pick a backend):
+
+```bash
+.venv/bin/python examples/quickstart.py examples/config.qwen.json   # free, local, no API key
+# or
+export ZAI_API_KEY="..." && .venv/bin/python examples/quickstart.py examples/config.zai.json
+```
+
+Leave it running — it prints the endpoint and waits.
+
+Terminal 2 — run Codex against it:
+
+```bash
+./examples/run_codex.sh qwen2.5-coder:7b "create a hello.py that prints Hello World"
+# or, to match the zai config above:
+./examples/run_codex.sh glm-5.3 "create a hello.py that prints Hello World"
+```
+
+**4. Stop and inspect.** Back in terminal 1, press Ctrl-C — it prints a summary of every call, and
+the full session is saved to `logs/calls-*.jsonl`.
+
+## Pointing Codex at the recorder permanently
+
+For everyday use (rather than one-off testing), add a provider to `~/.codex/config.toml`:
 
 ```toml
 model_provider = "codex_probe"
