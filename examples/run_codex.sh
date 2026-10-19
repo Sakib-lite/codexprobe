@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Run a real Codex task through CodexProbe without touching ~/.codex/config.toml.
-# Usage: ./examples/run_codex.sh <model> "<task>"
-# Example: ./examples/run_codex.sh qwen2.5-coder:7b "create a hello.py that prints Hello World"
+# Usage: ./examples/run_codex.sh <model> "<task>" [wire_api]
+# Example: ./examples/run_codex.sh glm-5.3 "create a hello.py that prints Hello World"
+# Example: ./examples/run_codex.sh gpt-5-codex "create a hello.py that prints Hello World" responses
 set -euo pipefail
 
-MODEL="${1:?usage: run_codex.sh <model> \"<task>\"}"
-TASK="${2:?usage: run_codex.sh <model> \"<task>\"}"
+MODEL="${1:?usage: run_codex.sh <model> \"<task>\" [wire_api]}"
+TASK="${2:?usage: run_codex.sh <model> \"<task>\" [wire_api]}"
+WIRE_API="${3:-chat}"
 ENDPOINT="http://127.0.0.1:8135/v1"
-WIRE_API="chat"
 
 mkdir -p /tmp/codex-test
 cd /tmp/codex-test
