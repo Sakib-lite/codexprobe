@@ -9,3 +9,4 @@ build/
 .ruff_cache/
 logs/
 .DS_Store
+.env
