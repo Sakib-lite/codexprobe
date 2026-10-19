@@ -42,6 +42,8 @@ class RecordingProxy:
         started_at = datetime.now(UTC).isoformat()
         clock_start = time.perf_counter()
         request_body = await request.body()
+        if self._config.seed is not None:
+            request_body = _with_seed(request_body, self._config.seed)
         upstream_request = self._client.build_request(
             request.method,
             self._upstream_url(request),
@@ -202,6 +204,17 @@ def _relayed_headers(upstream: httpx.Response) -> dict[str, str]:
         for name, value in upstream.headers.items()
         if name.lower() not in DROPPED_RESPONSE_HEADERS
     }
+
+
+def _with_seed(body: bytes, seed: int) -> bytes:
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        return body
+    if not isinstance(parsed, dict) or "seed" in parsed:
+        return body
+    parsed["seed"] = seed
+    return json.dumps(parsed).encode("utf-8")
 
 
 def _json_body(body: bytes) -> dict[str, Any] | None:

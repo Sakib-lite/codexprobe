@@ -119,3 +119,34 @@ async def test_unreachable_backend_returns_502_and_records(log: JsonlCallLog) ->
     record = log.load()[0]
     assert record.response_status == 502
     assert record.request_body == CHAT_REQUEST
+
+
+async def test_configured_seed_added_to_seedless_requests(
+    backend: MockBackend, make_proxy: MakeProxy, log: JsonlCallLog
+) -> None:
+    seeded = ProbeConfig.from_dict(
+        {"upstream": {"base_url": "https://backend.test/v1", "api_key": "sk"}, "seed": 11}
+    )
+    async with make_proxy(seeded) as client:
+        await client.post("/v1/chat/completions", json=CHAT_REQUEST)
+    assert json.loads(backend.requests[0]["body"])["seed"] == 11
+    assert log.load()[0].request_body == {**CHAT_REQUEST, "seed": 11}
+
+
+async def test_request_with_its_own_seed_left_alone(
+    backend: MockBackend, make_proxy: MakeProxy
+) -> None:
+    seeded = ProbeConfig.from_dict(
+        {"upstream": {"base_url": "https://backend.test/v1", "api_key": "sk"}, "seed": 11}
+    )
+    async with make_proxy(seeded) as client:
+        await client.post("/v1/chat/completions", json={**CHAT_REQUEST, "seed": 7})
+    assert json.loads(backend.requests[0]["body"])["seed"] == 7
+
+
+async def test_no_seed_configured_means_untouched_body(
+    backend: MockBackend, make_proxy: MakeProxy
+) -> None:
+    async with make_proxy() as client:
+        await client.post("/v1/chat/completions", json=CHAT_REQUEST)
+    assert "seed" not in json.loads(backend.requests[0]["body"])
